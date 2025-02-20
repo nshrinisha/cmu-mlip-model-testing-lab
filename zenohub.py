@@ -1,14 +1,20 @@
-## If you don't have a Zeno account already, create one on Zeno Hub (https://hub.zenoml.com/signup). 
-## After logging in to Zeno Hub, generate your API key by clicking on your profile at the top right to navigate to your account page.
-
-# !pip install zeno_client
+import os
+from dotenv import load_dotenv
 from zeno_client import ZenoClient, ZenoMetric
 import pandas as pd
 
+load_dotenv()
+API_KEY = os.getenv("ZENO_API_KEY")
+
+if not API_KEY:
+    raise ValueError("API_KEY is not set! Please check your .env file.")
+
+print(f"API Key Loaded: {API_KEY[:5]}... (hidden for security)")
+
 df = pd.read_csv('tweets.csv')
 df = df.reset_index()
+df["index"] = df["index"].astype(str)  # Fix dtype issue
 
-# Initialize a client with the API key.
 client = ZenoClient(API_KEY)
 
 project = client.create_project(
@@ -23,9 +29,8 @@ project.upload_dataset(df, id_column="index", data_column="text", label_column="
 
 models = ['roberta', 'gpt2']
 for model in models:
-    df_system = df[['index', model]]
-    
-    # Measure accuracy for each instance, which is averaged by the ZenoMetric above
-    df_system["correct"] = (df_system[model] == df["label"]).astype(int)
-    
+    df_system = df[['index', model]].copy()  # Prevent SettingWithCopyWarning
+    df_system.loc[:, "correct"] = (df_system[model] == df["label"]).astype(int)  # Fix warning
     project.upload_system(df_system, name=model, id_column="index", output_column=model)
+
+print("Data uploaded successfully to Zeno!")
